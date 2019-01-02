@@ -1,7 +1,5 @@
 /* 
-* @Author: Mike Reich
-* @Date:   2015-09-25 12:16:25
-* @Last Modified 2015-09-25 @Last Modified time: 2015-09-25 12:16:25
+* @Author: Mike Reich, Manish Pratap Singh
 */
 
 'use strict';
@@ -9,6 +7,13 @@
 var SerialPort = require("serialport");
 
 class SIM900 {
+
+    /**
+     * SMS callback function to be called once sms is received. 
+     */
+    smsCallback = null;
+    debug = false;
+
     constructor(uart, baud) {
         this._uart = uart;
         this._baud = baud;
@@ -19,7 +24,7 @@ class SIM900 {
         }, false);
     }
     _handleData(data) {
-        //console.log('incoming data', data.toString());
+        this._log("debug", 'incoming data', data.toString());
         this._buffer += data;
     }
     _handleError(error) {
@@ -35,7 +40,7 @@ class SIM900 {
         var originalBuf = buf;
         if (buf && buf.length > 0 && buf[buf.length - 1] != String.fromCharCode(13))
             buf = buf + String.fromCharCode(13);
-        console.log('writing', buf.toString());
+        this._log("debug", 'writing', buf.toString());
         this._sp.write(buf, function (err) {
             that._sp.drain(function () {
                 setTimeout(function () {
@@ -70,7 +75,7 @@ class SIM900 {
         if (!this._buffer)
             return cb(error, response);
         var raw = this._buffer.toString().split("\r");
-        console.log('raw', raw);
+        this._log("debug", 'raw', raw);
         raw.forEach(function (res) {
             res = res.trim();
             if (res === '')
@@ -85,7 +90,7 @@ class SIM900 {
         cb(error, response, raw);
     }
     connect(cb) {
-        //console.log('opening connection');
+        this._log("debug", 'opening connection');
         var that = this;
         this._sp.open(function (err) {
             that._sp.on('data', that._handleData.bind(that));
@@ -111,6 +116,26 @@ class SIM900 {
             cb(err, res);
         });
     }
+
+    /**
+     * Initialize SMS Notification.
+     * @param {*} smsCallback Callback to be called once sms received , parameters will be number, receivedOn, message
+     * @param {*} cb Callback to be called after the initialization complted with error or response. 
+     */
+    initializeSmsNotification(smsCallback, cb) {
+        this.smsCallback = smsCallback;
+
+        var commands = [
+            ["AT", 500],
+            ["AT+CMGF=1", 500],
+            ["AT+CNMI=1,2,0,0,0", 500]
+        ]
+
+        this._writeCommandSequence(commands, function (err, res) {
+            cb(err, res);
+        });
+    }
+
     initializeGPRS(apn, user, pass, cb) {
         var commands = [
             "AT+SAPBR=3,1,\"APN\",\"" + apn + "\"",
@@ -182,7 +207,7 @@ class SIM900 {
                         getBytes(end + 1, end + 101);
                 }
                 else {
-                    console.log('raw failed', raw);
+                    this._log("debug", 'raw failed', raw);
                     that._writeCommand("AT+HTTPTERM", 100, function () { });
                     return cb(err, buff);
                 }
@@ -190,20 +215,20 @@ class SIM900 {
         };
         getBytes(0, 100);
     }
+
+    _log(level, message, ...args) {
+        switch (level) {
+            case "debug":
+                console.debug(message, args);
+                break;
+            case "info":
+                console.info(message, args);
+                break;
+            default:
+                console.log(message, args);
+                break;
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 module.exports = SIM900;
