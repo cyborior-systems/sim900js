@@ -24,7 +24,6 @@
   },
   "homepage": "https://github.com/sensamo/sim900js#readme",
   "dependencies": {
-    "mraa": "^0.8.0",
-    "serialport": "^1.7.4"
+    "serialport": "^7.1.1"
   }
 }
